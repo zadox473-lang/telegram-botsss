@@ -17,7 +17,7 @@ TOKENS = [
 "8706272380:AAEaqaj1wZL8PLKMDAkEjVqctlZbx3bNjXE" ,
 "8617207286:AAH6xvLRs3JfZ15ve-Y7aN_2UlUm-lgJDY4" ,
 ]
-OWNER_ID = 8625596680
+OWNER_ID = 8602543306
 SUDO_FILE = "sudo.json"
 # ---------------------------
 # TEXT LISTS
