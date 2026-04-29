@@ -1,422 +1,465 @@
-import requests
-import uuid
-import time
-import random
-import json
-import string
-import re
-import os
-import sys
-import base64
-import secrets
-from datetime import datetime
-from threading import Thread
-from concurrent.futures import ThreadPoolExecutor
-
-email = None
-hits = 0
-good = 0
-taken = 0
-bad = 0
-limit = 0
-info = {}
-session = requests.session()
-_session = requests.session()
-
-Y = "\033[1;33m"
-W = "\033[1;37m"
-LG = "\x1b[38;5;120m"
-
-token = input(f"{LG}Token: {W}")
-id = input(f"{LG}Id: {W}")
-
-def UA():
-    return f"Instagram {random.randint(100,400)}.0.0.{random.randint(10,99)}.{random.randint(10,999)} Android (25/{random.choice(['7.1.2','8.0.0','9','10','11','12','13'])}; {random.choice(['320dpi','420dpi','450dpi','480dpi','560dpi'])}; {random.choice(['720x1280','1080x1920','1440x2560','2048x2048'])}; Google; {random.choice(['Pixel','Samsung','OnePlus','Xiaomi','Redmi'])}; {random.choice(['sailfish','walleye','marlin','oriole','sunfish'])}; {random.choice(['msm8996','sdm660','exynos8890','mt6768'])}; {random.choice(['en_US','en_GB','hi_IN'])}; {random.randint(100000000,999999999)})"
-    
-def dis():
-    os.system("clear")
-    a = f"""{Y}
-╔══════════════════════════════╗
-  {LG}𝗛𝗜𝗧𝗦 ➜ {W}{hits}
-  {LG}𝗚𝗢𝗢𝗗 ➜ {W}{good}
-  {LG}𝗧𝗔𝗞𝗘𝗡 ➜ {W}{taken}
-  {LG}𝗕𝗔𝗗 ➜ {W}{bad}
-  {LG}𝗥𝗔𝗧𝗘 𝗟𝗜𝗠𝗜𝗧 ➜ {W}{limit}
-  {LG}𝗘𝗠𝗔𝗜𝗟 ➜ {W}{email}
-{Y}╚══════════════════════════════╝
-"""
-    print(a)
-
-def _tokens():
-    global csrf, lsd
-    while True:
-        try:
-            headers = {
-                'User-Agent': UA(),
-                'x-ig-app-id': "936619743392459",
-            }
-            response = session.get('https://www.instagram.com/', headers=headers, timeout=20)
-            csrf = response.cookies.get('csrftoken', '')
-            find = re.search(r'"LSD",\[\],\{"token":"(.*?)"\}', response.text)
-            lsd = find.group(1) if find else None
-            with open("csrf.txt", "w") as fd:
-            	fd.write(f"{csrf}|{lsd}")
-        except:
-            pass
-Thread(target=_tokens, daemon=True).start()
-
-def _load():
+import asyncio, json, os, random, time
+from telegram import Update
+from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
+import logging
+# ---------------------------
+# CONFIG
+# ---------------------------
+TOKENS = [
+"8236012068:AAFNu_lVLp8u0IzCqVki6bHLpWrG7ssYUqM",
+"8760396691:AAG92xda9deZLByYQQMLkZyyqqp3MQzpLXI","8621431374:AAEps8MLGYRW7cNDcRCp-yu7WqErcMVNyx0","8706272380:AAFVbxnKLRUgQFDQJ1AH25QPFJ5eMTg2g4Y","8412182639:AAGAi34TgCiwJqBrRt_yRaI-yRWtNPbSkf4",
+"8743347235:AAHkiME7wDz_TSOkGhZyF616bduEbBBAh8E",
+"8651760309:AAE3ccUzWi2incOx8KJBiNz1gllVdJ9m8BU",
+"8668142941:AAFNSBvnULs0kxK89bOYd8MuYteZiWCyYvw" ,
+]
+OWNER_ID = 8625596680
+SUDO_FILE = "sudo.json"
+# ---------------------------
+# TEXT LISTS
+# ---------------------------
+RAID_TEXTS = ["RNDִֶָ𓂃 ࣪˖ ִֶָ👑་༘࿐","NICHI JAATִֶָ𓂃 ࣪˖ ִֶָ👑་༘࿐","HAKLEִֶָ𓂃 ࣪˖ ִֶָ👑་༘࿐","TMKCִֶָ𓂃 ࣪˖ ִֶָ👑་༘࿐","BAUNEִֶָ𓂃 ࣪˖ ִֶָ👑་༘࿐","BITCHִֶָ𓂃 ࣪˖ ִֶָ👑་༘࿐","CHUDִֶָ𓂃 ࣪˖ ִֶָ👑་༘࿐","TMKBִֶָ𓂃 ࣪˖ ִֶָ👑་༘࿐","KAMZORִֶָ𓂃 ࣪˖ ִֶָ👑་༘࿐","TATTI KHAִֶָ𓂃 ࣪˖ ִֶָ👑་༘࿐","CHINNALִֶָ𓂃 ࣪˖ ִֶָ👑་༘࿐","MOTEִֶָ𓂃 ࣪˖ ִֶָ👑་༘࿐","GAREEBִֶָ𓂃 ࣪˖ ִֶָ👑་༘࿐","HIJDEִֶָ𓂃 ࣪˖ ִֶָ👑་༘࿐","LAND LEִֶָ𓂃 ࣪˖ ִֶָ👑་༘࿐","TERI MA RNDIִֶָ𓂃 ࣪˖ ִֶָ👑་༘࿐","CVR KRִֶָ𓂃 ࣪˖ ִֶָ👑་༘࿐","MAR MATִֶָ𓂃 ࣪˖ ִֶָ👑་༘࿐","BHAGAִֶָ𓂃 ࣪˖ ִֶָ👑་༘࿐","KIDEEִֶָ𓂃 ࣪˖ ִֶָ👑་༘࿐","ANDHE LODEִֶָ𓂃 ࣪˖ ִֶָ👑་༘࿐",]
+NCEMO_EMOJIS = ["🎐𓍼ֶָ֢⊹ ࣪ ˖","💋𓍼ֶָ֢⊹ ࣪ ˖","✨ 𓍼ֶָ֢⊹ ࣪ ˖","🍂𓍼ֶָ֢⊹ ࣪ ˖","🍀𓍼ֶָ֢⊹ ࣪ ˖","🪐𓍼ֶָ֢⊹ ࣪ ˖","〽 ️𓍼ֶָ֢⊹ ࣪ ˖","✴️𓍼ֶָ֢⊹ ࣪ ˖","💠𓍼ֶָ֢⊹ ࣪ ˖","🥀𓍼ֶָ֢⊹ ࣪ ˖","❄️𓍼ֶָ֢⊹ ࣪ ˖","🎗️𓍼ֶָ֢⊹ ࣪ ˖","🎏𓍼ֶָ֢⊹ ࣪ ˖","🪢𓍼ֶָ֢⊹ ࣪ ˖","🐚𓍼ֶָ֢⊹ ࣪
+˖","🫧𓍼ֶָ֢⊹ ࣪ ˖","🦋𓍼ֶָ֢⊹ ࣪ ˖","🪅𓍼ֶָ֢⊹ ࣪ ˖","📍𓍼ֶָ֢⊹ ࣪ ˖","🪄𓍼ֶָ֢⊹ ࣪ ˖","🧸𓍼ֶָ֢⊹ ࣪ ˖","🎋𓍼ֶָ֢⊹ ࣪ ˖"]
+HEART_EMOJIS = ["𓆩🩶𓆪","𓆩🩵𓆪","𓆩🩷𓆪","𓆩🤍𓆪","𓆩🖤𓆪","𓆩🤎𓆪","𓆩💜𓆪","𓆩💙𓆪","𓆩💚𓆪","𓆩💛𓆪","𓆩🧡𓆪","𓆩❤️𓆪","𓆩♥️𓆪","𓆩❤️‍🩹𓆪","𓆩💔𓆪","𓆩💝𓆪","𓆩💖𓆪"]
+ANIMAL_EMOJIS = ["ˏˋ°•*⁀➷🐶", "ˏˋ°•*⁀➷🐱", "ˏˋ°•*⁀➷🐭", "ˏˋ°•*⁀➷🐹", "ˏˋ°•*⁀➷🐰", "ˏˋ°•*⁀➷🦊", "ˏˋ°•*⁀➷🐻", "ˏˋ°•*⁀➷🐼", "ˏˋ°•*⁀➷🐨", "ˏˋ°•*⁀➷🐯", "ˏˋ°•*⁀➷🦁",
+"ˏˋ°•*⁀➷🐮", "ˏˋ°•*⁀➷🐷", "ˏˋ°•*⁀➷🐸", "ˏˋ°•*⁀➷🐵", "ˏˋ°•*⁀➷🐔", "ˏˋ°•*⁀➷🐧", "ˏˋ°•*⁀➷🐦", "ˏˋ°•*⁀➷🐤", "ˏˋ°•*⁀➷🦆", "ˏˋ°•*⁀➷🦅", "ˏˋ°•*⁀➷🦉", "ˏˋ°•*⁀➷🦇", "ˏˋ°•*⁀➷🐽", "ˏˋ°•*⁀➷🐗", "ˏˋ°•*⁀➷🐎", "ˏˋ°•*⁀➷🦄", "ˏˋ°•*⁀➷🐝", "ˏˋ°•*⁀➷🪱", "ˏˋ°•*⁀➷🐛", "ˏˋ°•*⁀➷🦋", "ˏˋ°•*⁀➷🐌", "ˏˋ°•*⁀➷🐞"]
+MASK_EMOJIS = ["𓂃😉𓂃","𓂃😗𓂃","𓂃😙𓂃 ","𓂃😚𓂃 ","𓂃😘𓂃 ","𓂃🥰𓂃 ","𓂃😍𓂃 ","𓂃😋𓂃 ","𓂃😻𓂃 ","𓂃😽𓂃 ","𓂃😛𓂃 ","𓂃🙈𓂃 "]
+CHOCO_EMOJIS = ["𝘛𝘈𝘛𝘛𝘌💝𓂃 ࣪˖ ִֶཐི༏ཋྀ","𝘙𝘕𝘋 💝𓂃 ࣪˖ ִֶཐི༏ཋྀ","𝘛𝘔𝘒𝘉💝𓂃 ࣪˖ ִֶཐི༏ཋྀ","𝘓𝘈𝘕𝘋 𝘓𝘌💝𓂃 ࣪˖ ִֶཐི༏ཋྀ","𝘊𝘏𝘜𝘋 💝𓂃 ࣪˖ ִֶཐི༏ཋྀ","𝘊𝘏𝘐𝘕𝘕𝘈𝘙💝𓂃 ࣪˖ ִֶཐི༏ཋྀ","𝘔𝘈 𝘊𝘏𝘜𝘋𝘈 💝𓂃 ࣪˖ ִֶཐི༏ཋྀ","𝘛𝘔𝘒𝘊💝𓂃 ࣪˖ ִֶཐི༏ཋྀ","𝘛𝘔𝘙💝𓂃 ࣪˖ ִֶཐི༏ཋྀ","𝘎𝘈𝘙𝘌𝘌𝘉💝𓂃 ࣪˖ ִֶཐི༏ཋྀ","𝘛𝘔𝘒𝘉💝𓂃 ࣪˖ ִֶཐི༏ཋྀ","𝘛𝘈𝘛𝘛𝘌💝𓂃 ࣪˖ ִֶཐི༏ཋྀ","𝘊𝘏𝘜𝘋𝘋𝘒𝘈𝘙💝𓂃 ࣪˖ ִֶཐི༏ཋྀ","𝘊𝘏𝘈𝘔𝘈𝘙💝𓂃 ࣪˖ ִֶཐི༏ཋྀ","𝘕𝘐𝘊𝘏𝘐 𝘑𝘈𝘈𝘛💝𓂃 ࣪˖ ִֶཐི༏ཋྀ"]
+allin1_TEXTS = ["कमजोर रण्डी 🩶᭪","कमजोर रण्डी 🩵᭪","कमजोर रण्डी 🩷᭪","कमजोर रण्डी 🤍᭪","कमजोर रण्डी 🤎᭪","कमजोर रण्डी 🖤᭪","कमजोर रण्डी 💜᭪","कमजोर रण्डी 💙᭪","कमजोर रण्डी 💛᭪","कमजोर रण्डी 🧡᭪","कमजोर रण्डी ❤️᭪","कमजोर रण्डी 💚᭪"
+"TERI बहन KI BRA 👙", "TERI  माँ KI BRA 👙", "TERI दादी KI BRA 👙", "TERI चाची KI BRA 👙",
+"TERE पिता KA BRA👙", "TERE भाई KA BRA 👙", "TERE दादा KA BRA 👙", "TERE चाचा KA BRA 👙",
+"TERE मोसी KA BRA 👙", "TERE मोसा KA BRA 👙", "TERI पत्नी KI BRA 👙", "TERI सास KA BRA 👙",
+"TERE ससुर KA BRA 👙", "TERE खाला KA BRA 👙",
+"𝘛𝘈𝘛𝘛𝘌💝𓂃 ࣪˖ ִֶཐི༏ཋྀ","𝘙𝘕𝘋 💝𓂃 ࣪˖ ִֶཐི༏ཋྀ","𝘛𝘔𝘒𝘉💝𓂃 ࣪˖ ִֶཐི༏ཋྀ","𝘓𝘈𝘕𝘋 𝘓𝘌💝𓂃 ࣪˖ ִֶཐི༏ཋྀ","𝘊𝘏𝘜𝘋 💝𓂃 ࣪˖ ִֶཐི༏ཋྀ","𝘊𝘏𝘐𝘕𝘕𝘈𝘙💝𓂃 ࣪˖
+ִֶཐི༏ཋྀ","𝘔𝘈 𝘊𝘏𝘜𝘋𝘈 💝𓂃 ࣪˖ ִֶཐི༏ཋྀ","𝘛𝘔𝘒𝘊💝𓂃 ࣪˖ ִֶཐི༏ཋྀ","𝘛𝘔𝘙💝𓂃 ࣪˖ ִֶཐི༏ཋྀ","𝘎𝘈𝘙𝘌𝘌𝘉💝𓂃 ࣪˖ ִֶཐི༏ཋྀ","𝘛𝘔𝘒𝘉💝𓂃 ࣪˖ ִֶཐི༏ཋྀ","𝘛𝘈𝘛𝘛𝘌💝𓂃 ࣪˖ ִֶཐི༏ཋྀ","𝘊𝘏𝘜𝘋𝘋𝘒𝘈𝘙💝𓂃 ࣪˖ ִֶཐི༏ཋྀ","𝘊𝘏𝘈𝘔𝘈𝘙💝𓂃 ࣪˖ ִֶཐི༏ཋྀ","𝘕𝘐𝘊𝘏𝘐 𝘑𝘈𝘈𝘛💝𓂃 ࣪˖ ִֶཐི༏ཋྀ",
+    "RNDִֶָ𓂃 ࣪˖ ִֶָ🐇་༘࿐","NICHI JAATִֶָ𓂃 ࣪˖ ִֶָ🐇་༘࿐","HAKLEִֶָ𓂃 ࣪˖ ִֶָ🐇་༘࿐","TMKCִֶָ𓂃 ࣪˖ ִֶָ🐇་༘࿐","BAUNEִֶָ𓂃 ࣪˖ ִֶָ🐇་༘࿐","BITCHִֶָ𓂃 ࣪˖ ִֶָ🐇་༘࿐","CHUDִֶָ𓂃 ࣪˖ ִֶָ🐇་༘࿐","TMKBִֶָ𓂃 ࣪˖ ִֶָ🐇་༘࿐","KAMZORִֶָ𓂃 ࣪˖ ִֶָ🐇་༘࿐","TATTI KHAִֶָ𓂃 ࣪˖ ִֶָ🐇་༘࿐","CHINNALִֶָ𓂃 ࣪˖ ִֶָ🐇་༘࿐","MOTEִֶָ𓂃 ࣪˖ ִֶָ🐇་༘࿐","GAREEBִֶָ𓂃 ࣪˖ ִֶָ🐇་༘࿐","HIJDEִֶָ𓂃 ࣪˖ ִֶָ🐇་༘࿐","LAND LEִֶָ𓂃 ࣪˖ ִֶָ🐇་༘࿐","TERI MA RNDIִֶָ𓂃 ࣪˖ ִֶָ🐇་༘࿐","CVR KRִֶָ𓂃 ࣪˖ ִֶָ🐇་༘࿐","MAR MATִֶָ𓂃 ࣪˖ ִֶָ🐇་༘࿐","BHAGAִֶָ𓂃 ࣪˖ ִֶָ🐇་༘࿐","KIDEEִֶָ𓂃 ࣪˖ ִֶָ🐇་༘࿐","ANDHE LODEִֶָ𓂃 ࣪˖ ִֶָ🐇་༘࿐",
+"चुद पुत्र ִֶ 𓂃🏴‍☠️⊹","चुद पुत्र ִֶ 𓂃🇦🇱⊹","चुद पुत्रˑ ִֶ 𓂃🇦🇫⊹","चुद पुत्रˑ ִֶ 𓂃🇧🇧⊹","चुद पुत्रˑ ִֶ 𓂃🇧🇱⊹","चुद पुत्रˑ ִֶ 𓂃🇪🇺⊹","चुद पुत्रˑ ִֶ 𓂃🇦🇺⊹","चुद पुत्रˑ ִֶ 𓂃🇪🇪⊹","चुद पुत्रˑ ִֶ 𓂃🇪🇭⊹","चुद पुत्रˑ ִֶ 𓂃🇬🇵⊹","चुद पुत्रˑ ִֶ 𓂃🇭🇰⊹","चुद पुत्रˑ ִֶ 𓂃🇪🇬⊹","चुद पुत्रˑ ִֶ 𓂃🇲🇴⊹","चुद पुत्रˑ ִֶ 𓂃🇵🇬⊹","चुद पुत्रˑ ִֶ 𓂃🇱🇾⊹","चुद पुत्रˑ ִֶ 𓂃🇲🇦⊹","चुद पुत्रˑ ִֶ 𓂃🏴󠁧󠁢󠁷󠁬󠁳󠁿⊹","चुद पुत्रˑ ִֶ 𓂃🇻🇮⊹","चुद पुत्रˑ ִֶ 𓂃🇸🇩⊹","चुद पुत्रˑ ִֶ
+𓂃🇲🇵⊹","चुद पुत्रˑ ִֶ 𓂃🇾🇹⊹","चुद पुत्रˑ ִֶ 𓂃🇹🇷⊹","चुद पुत्रˑ ִֶ 𓂃🇸🇾⊹","चुद पुत्रˑ ִֶ 𓂃🇸🇬⊹","चुद पुत्रˑ ִֶ 𓂃🇸🇬⊹",
+"──(😀)──मुल्ला нαι тυ","──(😂)──मुल्ला нαι тυ","──(🤣)──मुल्ला нαι тυ","──(😭)──मुल्ला нαι тυ","──(😝)──मुल्ला нαι тυ","──(🙂)──मुल्ला нαι тυ","──(😙)──मुल्ला
+нαι тυ","──(🥶)──मुल्ला нαι тυ","──(🤢)──मुल्ला нαι тυ","──(🤡)──मुल्ला нαι тυ","──(💀)──मुल्ला нαι тυ","──(👻)──मुल्ला нαι тυ","──(💩)──मुल्ला нαι тυ","──(👹)──मुल्ला нαι тυ",
+"तू लंड पे(🍂)ᝰ.ᐟ","रण्डी(🍂)ᝰ.ᐟ","चक्का(🍂)ᝰ.ᐟ","सुआर(🍂)ᝰ.ᐟ","लुंडचूस(🍂)ᝰ.ᐟ","चूतिया(🍂)ᝰ.ᐟ","कामजोर(🍂)ᝰ.ᐟ","गरीब(🍂)ᝰ.ᐟ","गुलाम(🍂)ᝰ.ᐟ","माधरचोद(🍂)ᝰ.ᐟ","कुतिया(🍂)ᝰ.ᐟ","तू लंड पे(❄️)ᝰ.ᐟ","रण्डी(❄️)ᝰ.ᐟ","चक्का(❄️)ᝰ.ᐟ","सुआर(❄️)ᝰ.ᐟ","लुंडचूस(❄️)ᝰ.ᐟ","चूतिया(❄️)ᝰ.ᐟ","कामजोर(❄️)ᝰ.ᐟ","गरीब(❄️)ᝰ.ᐟ","गुलाम(❄️)ᝰ.ᐟ","माधरचोद(❄️)ᝰ.ᐟ","कुतिया(❄️)ᝰ.ᐟ","तू लंड पे(🫧)ᝰ.ᐟ","रण्डी(🫧)ᝰ.ᐟ","चक्का(🫧)ᝰ.ᐟ","सुआर(🫧)ᝰ.ᐟ","लुंडचूस(🫧)ᝰ.ᐟ","चूतिया(🫧)ᝰ.ᐟ","कामजोर(🫧)ᝰ.ᐟ","गरीब(🫧)ᝰ.ᐟ","गुलाम(🫧)ᝰ.ᐟ","माधरचोद(🫧)ᝰ.ᐟ","कुतिया(🫧)ᝰ.ᐟ",
+"𝙍𝘼𝙉𝘿 𝙎𝙊𝙉: ̗̀➛🩶₊⊹","𝙍𝘼𝙉𝘿 𝙎𝙊𝙉: ̗̀➛🩵₊⊹","𝙍𝘼𝙉𝘿 𝙎𝙊𝙉: ̗̀➛🩷₊⊹","𝙍𝘼𝙉𝘿 𝙎𝙊𝙉: ̗̀➛🤍₊⊹","𝙍𝘼𝙉𝘿 𝙎𝙊𝙉: ̗̀➛🖤₊⊹","𝙍𝘼𝙉𝘿 𝙎𝙊𝙉: ̗̀➛🤎₊⊹","𝙍𝘼𝙉𝘿 𝙎𝙊𝙉: ̗̀➛💜₊⊹","𝙍𝘼𝙉𝘿 𝙎𝙊𝙉: ̗̀➛💙₊⊹","𝙍𝘼𝙉𝘿 𝙎𝙊𝙉: ̗̀➛💚₊⊹","𝙍𝘼𝙉𝘿 𝙎𝙊𝙉: ̗̀➛💛₊⊹","𝙍𝘼𝙉𝘿 𝙎𝙊𝙉: ̗̀➛🧡₊⊹","𝙍𝘼𝙉𝘿 𝙎𝙊𝙉: ̗̀➛❤️₊⊹","𝙍𝘼𝙉𝘿 𝙎𝙊𝙉: ̗̀➛🤎₊⊹","𝙍𝘼𝙉𝘿 𝙎𝙊𝙉: ̗̀➛🤍₊⊹","𝙍𝘼𝙉𝘿 𝙎𝙊𝙉: ̗̀➛💞₊⊹","𝙍𝘼𝙉𝘿 𝙎𝙊𝙉: ̗̀➛💕₊⊹","𝙍𝘼𝙉𝘿 𝙎𝙊𝙉: ̗̀➛💔₊⊹","𝙍𝘼𝙉𝘿 𝙎𝙊𝙉: ̗̀➛💗₊⊹","𝙍𝘼𝙉𝘿 𝙎𝙊𝙉: ̗̀➛💗₊⊹","𝙍𝘼𝙉𝘿 𝙎𝙊𝙉: ̗̀➛💖₊⊹",
+"ʜɪᴊᴅᴜ ʙᴏʏ<🌹>","ʜɪᴊᴅᴜ ʙᴏʏ<🥀>","ʜɪᴊᴅᴜ ʙᴏʏ<🌺>","ʜɪᴊᴅᴜ ʙᴏʏ<🌷>","ʜɪᴊᴅᴜ ʙᴏʏ<🪷>","ʜɪᴊᴅᴜ ʙᴏʏ<🌸>","ʜɪᴊᴅᴜ ʙᴏʏ<💮>","ʜɪᴊᴅᴜ ʙᴏʏ<🏵️>","ʜɪᴊᴅᴜ ʙᴏʏ<🪻>","ʜɪᴊᴅᴜ ʙᴏʏ<🌻>","ʜɪᴊᴅᴜ ʙᴏʏ<🌼>","ʜɪᴊᴅᴜ ʙᴏʏ<🍁>",
+"𐙚⋆.˚𓂃🌸˚ 𝘓𝘈𝘕𝘎𝘋𝘌.𖥔 ݁ ˖", "𐙚⋆.˚𓂃🌷˚ 𝘔𝘖𝘛𝘌.𖥔 ݁ ˖ ", "𐙚⋆.˚𓂃🌹˚ 𝘉𝘈𝘜𝘕𝘌.𖥔 ݁ ˖ ", "𐙚⋆.˚𓂃🌺˚ 𝘒𝘐𝘋𝘋𝘈.𖥔 ݁ ˖ ", "𐙚⋆.˚𓂃🌼˚ 𝘙𝘈𝘕𝘋𝘈𝘓.𖥔 ݁ ˖ ", "𐙚⋆.˚𓂃🪻˚ 𝘊𝘏𝘐𝘕𝘕𝘈𝘓.𖥔 ݁ ˖", "𐙚⋆.˚𓂃💮˚ 𝘎𝘈𝘙𝘌𝘌𝘉.𖥔 ݁ ˖ ",
+    " ᴛᴍᴋᴄ❤️!", "  ᴛᴍᴋᴄ🩷!", "   ᴛᴍᴋᴄ🧡!", "  ᴛᴍᴋᴄ💛!",
+    "  ᴛᴍᴋᴄ💚!", "  ᴛᴍᴋᴄ💙!", "  ᴛᴍᴋᴄ🩵!", "  ᴛᴍᴋᴄ🩵!",
+    "  ᴛᴍᴋᴄ💜!", "  ᴛᴍᴋᴄ🖤!", "  ᴛᴍᴋᴄ🩶!", "  ᴛᴍᴋᴄ🤎!",
+    "   ᴛᴍᴋᴄ🤎!", "  ᴛᴍᴋᴄ🤍!", "  ᴛᴍᴋᴄ💞!", "  ᴛᴍᴋᴄ💕!",
+    "  ᴛᴍᴋᴄ💔!", "  ᴛᴍᴋᴄ💗!", "  ᴛᴍᴋᴄ💗!", "  ᴛᴍᴋᴄ💖!",
+    "  ᴛᴍᴋᴄ❤️‍🩹!", "  ᴛᴍᴋᴄ🐵!", "   ᴛᴍᴋᴄ🐒!", " ᴛᴍᴋᴄ🐶!",
+    "  ᴛᴍᴋᴄ🐕!", "  ᴛᴍᴋᴄ🐩!", "  ᴛᴍᴋᴄ狼 !", "  ᴛᴍᴋᴄ🦊!",
+    "  ᴛᴍᴋᴄ🦝!", "  ᴛᴍᴋᴄ🐱!", "  ᴛᴍᴋᴄ🐈!", "   ᴛᴍᴋᴄ🐈!",
+    "  ᴛᴍᴋᴄ🐯!", "  ᴛᴍᴋᴄ🐯!", "  ᴛᴍᴋᴄ🐎!", "  ᴛᴍᴋᴄ🦄!",
+    "  ᴛᴍᴋᴄ!", "  ᴛᴍᴋᴄ🦓!", "  ᴛᴍᴋᴄ deer!", "  ᴛᴍᴋᴄ🐮!",
+    "  ᴛᴍᴋᴄ🐮!", "  ᴛᴍᴋᴄ🐂!", "  ᴛᴍᴋᴄ🐄!", "  ᴛᴍᴋᴄ🐷!",
+    "   ᴛᴍᴋᴄ!", "  ᴛᴍᴋᴄ🐑!", "  ᴛᴍᴋᴄ🐐!", "  ᴛᴍᴋᴄ🐖!",
+    "  ᴛᴍᴋᴄ🐗!", "  ᴛᴍᴋᴄ🙈!", "  ᴛᴍᴋᴄ🙉!", "  ᴛᴍᴋᴄ🙊!",
+    "  ᴛᴍᴋᴄ!", "  ᴛᴍᴋᴄ🐽!", "   ᴛᴍᴋᴄ🐐!", "  ᴛᴍᴋᴄ🐪!",
+    "  ᴛᴍᴋᴄ🦙!", "  ᴛᴍᴋᴄ 🦒!", "  ᴛᴍᴋᴄ 🐘!", "  ᴛᴍᴋᴄ!",
+    "  ᴛᴍᴋᴄ!", "  ᴛᴍᴋᴄ!", "  ᴛᴍᴋᴄ🐭!", "  ᴛᴍᴋᴄ🐁!",
+    "   ᴛᴍᴋᴄ rats!", "  ᴛᴍᴋᴄ!", "  ᴛᴍᴋᴄ 🐹!", "  ᴛᴍᴋᴄ 🐹!",
+    "  ᴛᴍᴋᴄ🐰!", "  ᴛᴍᴋᴄ👑!", "  ᴛᴍᴋᴄ👑!",
+    "  ᴛᴍᴋᴄ 🐿️!", "  ᴛᴍᴋᴄ 🦔!", "  ᴛᴍᴋᴄ 🏓!",
+    "   ᴛᴍᴋᴄ 🦇!", "  ᴛᴍᴋᴄ 🐻!", "  ᴛᴍᴋᴄ 🐨!", "  ᴛᴍᴋᴄ 🐨!",
+    "  ᴛᴍᴋᴄ 🐼!", "  ᴛᴍᴋᴄ 🦘!", "  ᴛᴍᴋᴄ!", "  ᴛᴍᴋᴄ ??!",
+    "  ᴛᴍᴋᴄ 🦡!", "  ᴛᴍᴋᴄ 🐾!", "   ᴛᴍᴋᴄ 🦃!", "  ᴛᴍᴋᴄ 🦃!",
+    "  ᴛᴍᴋᴄ 🍗!", "  ᴛᴍᴋᴄ!", "  ᴛᴍᴋᴄ 🐓!", "  ᴛᴍᴋᴄ 🐔!",
+    "  ᴛᴍᴋᴄ 🐥!", "  ᴛᴍᴋᴄ 🐦!", "  ᴛᴍᴋᴄ 🐈‍⬛ !", "  ᴛᴍᴋᴄ 🐧!",
+    "   ᴛᴍᴋᴄ 🕊️!", "  ᴛᴍᴋᴄ!", "  ᴛᴍᴋᴄ 🦅!", "  ᴛᴍᴋᴄ 🦆!",
+    "  ᴛᴍᴋᴄ 🦢!", "  ᴛᴍᴋᴄ 🦉!", "  ᴛᴍᴋᴄ!", "  ᴛᴍᴋᴄ 🦉!",
+    "  ᴛᴍᴋᴄ 🦚!", "  ᴛᴍᴋᴄ 🦜!", "   ᴛᴍᴋᴄ 💸!", "  ᴛᴍᴋᴄ!",
+    "  ᴛᴍᴋᴄ 🦆!", "  ᴛᴍᴋᴄ 🐸!", "  ᴛᴍᴋᴄ 🐊!", "  ᴛᴍᴋᴄ 🐢!",
+    "  ᴛᴍᴋᴄ 🦎!", "  ᴛᴍᴋᴄ 🐍!", "  ᴛᴍᴋᴄ 🐉!", "  ᴛᴍᴋᴄ 🐲!",
+    "   ᴛᴍᴋᴄ 🦕!", "  ᴛᴍᴋᴄ 🐢!", "  ᴛᴍᴋᴄ 🐋!", "  ᴛᴍᴋᴄ!",
+    "  ᴛᴍᴋᴄ 🐳!", "  ᴛᴍᴋᴄ 🐬!", "  ᴛᴍᴋᴄ 🐟!", "  ᴛᴍᴋᴄ!",
+    "  ᴛᴍᴋᴄ 🐠!", "  ᴛᴍᴋᴄ 🐡!", "   ᴛᴍᴋᴄ 🦈!", "  ᴛᴍᴋᴄ 🦑!",
+    "  ᴛᴍᴋᴄ!", "  ᴛᴍᴋᴄ 🐚!", "  ᴛᴍᴋᴄ 🐚!", "  ᴛᴍᴋᴄ 🐌!",
+    "  ᴛᴍᴋᴄ!", "  ᴛᴍᴋᴄ 🦋!", "  ᴛᴍᴋᴄ 🐌!", "  ᴛᴍᴋᴄ 🎀!",
+    "   ᴛᴍᴋᴄ 🐜!", "  ᴛᴍᴋᴄ 🐝!", "  ᴛᴍᴋᴄ 🐝!", "  ᴛᴍᴋᴄ 🐞!",
+    "  ᴛᴍᴋᴄ 🦗!", "  ᴛᴍᴋᴄ 🏏!", "  ᴛᴍᴋᴄ 🕷️!", "  ᴛᴍᴋᴄ spider!",
+    "  ᴛᴍᴋᴄ 🕸️!", "  ᴛᴍᴋᴄ ♏ !", "   ᴛᴍᴋᴄ 🦟!", "  ᴛᴍᴋᴄ!",
+"───ʜ∆ᴋʟᴇ───(🖤)","───ʜ∆ᴋʟᴇ───(⚫ )","───ʜ∆ᴋʟᴇ───(🟤)","───ʜ∆ᴋʟᴇ───(🩷)","───ʜ∆ᴋʟᴇ───(🤍)","───ʜ∆ᴋʟᴇ───(💚)","───ʜ∆ᴋʟᴇ───(🖤)","───ʜ∆ᴋʟᴇ───(🔴)",
+"───ʜ∆ᴋʟᴇ───(❤️‍🩹)",
+"───ʜ∆ᴋʟᴇ───(💘)",
+"───ʜ∆ᴋʟᴇ───(💝)",
+"───ʜ∆ᴋʟᴇ───(💓)",
+"───ʜ∆ᴋʟᴇ───(🤍)",
+"───ʜ∆ᴋʟᴇ───(🧡)",
+"───ʜ∆ᴋʟᴇ───(💛)",
+"───ʜ∆ᴋʟᴇ───(🩷)",
+"───ʜ∆ᴋʟᴇ───(🩵)"
+]
+mulla2_TEXTS = ["चुद पुत्र ִֶ 𓂃🏴‍☠️⊹","चुद पुत्र ִֶ 𓂃🇦🇱⊹","चुद पुत्रˑ ִֶ 𓂃🇦🇫⊹","चुद पुत्रˑ ִֶ 𓂃🇧🇧⊹","चुद पुत्रˑ ִֶ 𓂃🇧🇱⊹","चुद पुत्रˑ ִֶ 𓂃🇪🇺⊹","चुद पुत्रˑ ִֶ 𓂃🇦🇺⊹","चुद पुत्रˑ ִֶ 𓂃🇪🇪⊹","चुद पुत्रˑ ִֶ 𓂃🇪🇭⊹","चुद पुत्रˑ ִֶ 𓂃🇬🇵⊹","चुद पुत्रˑ ִֶ 𓂃🇭🇰⊹","चुद पुत्रˑ ִֶ 𓂃🇪🇬⊹","चुद पुत्रˑ ִֶ 𓂃🇲🇴⊹","चुद पुत्रˑ ִֶ 𓂃🇵🇬⊹","चुद पुत्रˑ ִֶ 𓂃🇱🇾⊹","चुद पुत्रˑ ִֶ 𓂃🇲🇦⊹","चुद पुत्रˑ ִֶ 𓂃🏴󠁧󠁢󠁷󠁬󠁳󠁿⊹","चुद पुत्रˑ ִֶ 𓂃🇻🇮⊹","चुद पुत्रˑ ִֶ 𓂃🇸🇩⊹","चुद पुत्रˑ ִֶ 𓂃🇲🇵⊹","चुद पुत्रˑ ִֶ 𓂃🇾🇹⊹","चुद पुत्रˑ ִֶ 𓂃🇹🇷⊹","चुद पुत्रˑ ִֶ 𓂃🇸🇾⊹","चुद पुत्रˑ ִֶ 𓂃🇸🇬⊹","चुद पुत्रˑ ִֶ 𓂃🇸🇬⊹"]
+mulla_TEXTS = ["──(😀)──मुल्ला нαι тυ","──(😂)──मुल्ला нαι тυ","──(🤣)──मुल्ला нαι тυ","──(😭)──मुल्ला нαι тυ","──(😝)──मुल्ला нαι тυ","──(🙂)──मुल्ला нαι тυ","──(😙)──मुल्ला нαι тυ","──(🥶)──मुल्ला нαι тυ","──(🤢)──मुल्ला нαι тυ","──(🤡)──मुल्ला нαι тυ","──(💀)──मुल्ला нαι тυ","──(👻)──मुल्ला нαι тυ","──(💩)──मुल्ला нαι тυ","──(👹)──मुल्ला нαι тυ"]
+DRAGS_TEXTS = ["तू लंड पे(🍂)ᝰ.ᐟ","रण्डी(🍂)ᝰ.ᐟ","चक्का(🍂)ᝰ.ᐟ","सुआर(🍂)ᝰ.ᐟ","लुंडचूस(🍂)ᝰ.ᐟ","चूतिया(🍂)ᝰ.ᐟ","कामजोर(🍂)ᝰ.ᐟ","गरीब(🍂)ᝰ.ᐟ","गुलाम(🍂)ᝰ.ᐟ","माधरचोद(🍂)ᝰ.ᐟ","कुतिया(🍂)ᝰ.ᐟ","तू लंड पे(❄️)ᝰ.ᐟ","रण्डी(❄️)ᝰ.ᐟ","चक्का(❄️)ᝰ.ᐟ","सुआर(❄️)ᝰ.ᐟ","लुंडचूस(❄️)ᝰ.ᐟ","चूतिया(❄️)ᝰ.ᐟ","कामजोर(❄️)ᝰ.ᐟ","गरीब(❄️)ᝰ.ᐟ","गुलाम(❄️)ᝰ.ᐟ","माधरचोद(❄️)ᝰ.ᐟ","कुतिया(❄️)ᝰ.ᐟ","तू लंड पे(🫧)ᝰ.ᐟ","रण्डी(🫧)ᝰ.ᐟ","चक्का(🫧)ᝰ.ᐟ","सुआर(🫧)ᝰ.ᐟ","लुंडचूस(🫧)ᝰ.ᐟ","चूतिया(🫧)ᝰ.ᐟ","कामजोर(🫧)ᝰ.ᐟ","गरीब(🫧)ᝰ.ᐟ","गुलाम(🫧)ᝰ.ᐟ","माधरचोद(🫧)ᝰ.ᐟ","कुतिया(🫧)ᝰ.ᐟ"]
+NCBAAP_TEXTS = ["𝙍𝘼𝙉𝘿 𝙎𝙊𝙉: ̗̀➛🩶₊⊹","𝙍𝘼𝙉𝘿 𝙎𝙊𝙉: ̗̀➛🩵₊⊹","𝙍𝘼𝙉𝘿
+𝙎𝙊𝙉: ̗̀➛🩷₊⊹","𝙍𝘼𝙉𝘿 𝙎𝙊𝙉: ̗̀➛🤍₊⊹","𝙍𝘼𝙉𝘿 𝙎𝙊𝙉: ̗̀➛🖤₊⊹","𝙍𝘼𝙉𝘿 𝙎𝙊𝙉: ̗̀➛🤎₊⊹","𝙍𝘼𝙉𝘿 𝙎𝙊𝙉: ̗̀➛💜₊⊹","𝙍𝘼𝙉𝘿 𝙎𝙊𝙉: ̗̀➛💙₊⊹","𝙍𝘼𝙉𝘿 𝙎𝙊𝙉: ̗̀➛💚₊⊹","𝙍𝘼𝙉𝘿 𝙎𝙊𝙉: ̗̀➛💛₊⊹","𝙍𝘼𝙉𝘿 𝙎𝙊𝙉: ̗̀➛🧡₊⊹","𝙍𝘼𝙉𝘿 𝙎𝙊𝙉: ̗̀➛❤️₊⊹","𝙍𝘼𝙉𝘿 𝙎𝙊𝙉: ̗̀➛🤎₊⊹","𝙍𝘼𝙉𝘿 𝙎𝙊𝙉: ̗̀➛🤍₊⊹","𝙍𝘼𝙉𝘿 𝙎𝙊𝙉: ̗̀➛💞₊⊹","𝙍𝘼𝙉𝘿 𝙎𝙊𝙉: ̗̀➛💕₊⊹","𝙍𝘼𝙉𝘿 𝙎𝙊𝙉: ̗̀➛💔₊⊹","𝙍𝘼𝙉𝘿 𝙎𝙊𝙉: ̗̀➛💗₊⊹","𝙍𝘼𝙉𝘿 𝙎𝙊𝙉: ̗̀➛💗₊⊹","𝙍𝘼𝙉𝘿 𝙎𝙊𝙉: ̗̀➛💖₊⊹"]
+REHAND_TEXTS = ["ʜɪᴊᴅᴜ ʙᴏʏ<🌹>","ʜɪᴊᴅᴜ ʙᴏʏ<🥀>","ʜɪᴊᴅᴜ ʙᴏʏ<🌺>","ʜɪᴊᴅᴜ ʙᴏʏ<🌷>","ʜɪᴊᴅᴜ ʙᴏʏ<🪷>","ʜɪᴊᴅᴜ ʙᴏʏ<🌸>","ʜɪᴊᴅᴜ ʙᴏʏ<💮>","ʜɪᴊᴅᴜ ʙᴏʏ<🏵️>","ʜɪᴊᴅᴜ ʙᴏʏ<🪻>","ʜɪᴊᴅᴜ ʙᴏʏ<🌻>","ʜɪᴊᴅᴜ ʙᴏʏ<🌼>","ʜɪᴊᴅᴜ ʙᴏʏ<🍁>"]
+FLOWNC_TEXTS = ["𐙚⋆.˚𓂃🌸˚{target} 𝘓𝘈𝘕𝘎𝘋𝘌.𖥔 ݁ ˖", "𐙚⋆.˚𓂃🌷˚{target} 𝘔𝘖𝘛𝘌.𖥔 ݁ ˖ ", "𐙚⋆.˚𓂃🌹˚{target} 𝘉𝘈𝘜𝘕𝘌.𖥔 ݁ ˖ ", "𐙚⋆.˚𓂃🌺˚{target} 𝘒𝘐𝘋𝘋𝘈.𖥔 ݁ ˖ ", "𐙚⋆.˚𓂃🌼˚{target} 𝘙𝘈𝘕𝘋𝘈𝘓.𖥔 ݁ ˖ ", "𐙚⋆.˚𓂃🪻˚{target} 𝘊𝘏𝘐𝘕𝘕𝘈𝘓.𖥔 ݁ ˖", "𐙚⋆.˚𓂃💮˚{target} 𝘎𝘈𝘙𝘌𝘌𝘉.𖥔 ݁ ˖ "]
+NEXTGEN_TEXTS = [
+    "{target}   ᴛᴍᴋᴄ❤️!", " {target}   ᴛᴍᴋᴄ🩷!", " {target}    ᴛᴍᴋᴄ🧡!", " {target}   ᴛᴍᴋᴄ💛!",
+    " {target}   ᴛᴍᴋᴄ💚!", " {target}   ᴛᴍᴋᴄ💙!", " {target}   ᴛᴍᴋᴄ🩵!", " {target}   ᴛᴍᴋᴄ🩵!",
+    " {target}   ᴛᴍᴋᴄ💜!", " {target}   ᴛᴍᴋᴄ🖤!", " {target}   ᴛᴍᴋᴄ🩶!", " {target}   ᴛᴍᴋᴄ🤎!",
+    " {target}    ᴛᴍᴋᴄ🤎!", " {target}   ᴛᴍᴋᴄ🤍!", " {target}   ᴛᴍᴋᴄ💞!", " {target}   ᴛᴍᴋᴄ💕!",
+    " {target}   ᴛᴍᴋᴄ💔!", " {target}   ᴛᴍᴋᴄ💗!", " {target}   ᴛᴍᴋᴄ💗!", " {target}   ᴛᴍᴋᴄ💖!",
+    " {target}   ᴛᴍᴋᴄ❤️‍🩹!", " {target}   ᴛᴍᴋᴄ🐵!", " {target}    ᴛᴍᴋᴄ🐒!", "{target}   ᴛᴍᴋᴄ🐶!",
+    " {target}   ᴛᴍᴋᴄ🐕!", " {target}   ᴛᴍᴋᴄ🐩!", " {target}   ᴛᴍᴋᴄ狼 !", " {target}   ᴛᴍᴋᴄ🦊!",
+    " {target}   ᴛᴍᴋᴄ🦝!", " {target}   ᴛᴍᴋᴄ🐱!", " {target}   ᴛᴍᴋᴄ🐈!", " {target}    ᴛᴍᴋᴄ🐈!",
+    " {target}   ᴛᴍᴋᴄ🐯!", " {target}   ᴛᴍᴋᴄ🐯!", "{target}    ᴛᴍᴋᴄ🐎!", " {target}   ᴛᴍᴋᴄ🦄!",
+    " {target}   ᴛᴍᴋᴄ!", " {target}   ᴛᴍᴋᴄ🦓!", " {target}   ᴛᴍᴋᴄ deer!", " {target}   ᴛᴍᴋᴄ🐮!",
+    " {target}   ᴛᴍᴋᴄ🐮!", " {target}   ᴛᴍᴋᴄ🐂!", " {target}   ᴛᴍᴋᴄ🐄!", " {target}   ᴛᴍᴋᴄ🐷!",
+    " {target}    ᴛᴍᴋᴄ!", " {target}   ᴛᴍᴋᴄ🐑!", " {target}   ᴛᴍᴋᴄ🐐!", " {target}   ᴛᴍᴋᴄ🐖!",
+    " {target}   ᴛᴍᴋᴄ🐗!", " {target}   ᴛᴍᴋᴄ🙈!", " {target}   ᴛᴍᴋᴄ🙉!", " {target}   ᴛᴍᴋᴄ🙊!",
+    " {target}   ᴛᴍᴋᴄ!", " {target}   ᴛᴍᴋᴄ🐽!", " {target}    ᴛᴍᴋᴄ🐐!", " {target}   ᴛᴍᴋᴄ🐪!",
+    " {target}   ᴛᴍᴋᴄ🦙!", " {target}   ᴛᴍᴋᴄ 🦒!", " {target}   ᴛᴍᴋᴄ 🐘!", " {target}   ᴛᴍᴋᴄ!",
+    " {target}   ᴛᴍᴋᴄ!", " {target}   ᴛᴍᴋᴄ!", " {target}   ᴛᴍᴋᴄ🐭!", " {target}
+  ᴛᴍᴋᴄ🐁!",
+    " {target}    ᴛᴍᴋᴄ rats!", " {target}   ᴛᴍᴋᴄ!", " {target}   ᴛᴍᴋᴄ 🐹!", " {target}   ᴛᴍᴋᴄ 🐹!",
+    " {target}   ᴛᴍᴋᴄ🐰!", " {target}   ᴛᴍᴋᴄ👑!", " {target}   ᴛᴍᴋᴄ👑!",
+    " {target}   ᴛᴍᴋᴄ 🐿️!", " {target}   ᴛᴍᴋᴄ 🦔!", " {target}   ᴛᴍᴋᴄ 🏓!",
+    " {target}    ᴛᴍᴋᴄ 🦇!", " {target}   ᴛᴍᴋᴄ 🐻!", " {target}   ᴛᴍᴋᴄ 🐨!", " {target}   ᴛᴍᴋᴄ 🐨!",
+    " {target}   ᴛᴍᴋᴄ 🐼!", " {target}   ᴛᴍᴋᴄ 🦘!", " {target}   ᴛᴍᴋᴄ!", " {target}   ᴛᴍᴋᴄ 🦘!",
+    " {target}   ᴛᴍᴋᴄ 🦡!", " {target}   ᴛᴍᴋᴄ 🐾!", " {target}    ᴛᴍᴋᴄ 🦃!", " {target}   ᴛᴍᴋᴄ 🦃!",
+    " {target}   ᴛᴍᴋᴄ 🍗!", " {target}   ᴛᴍᴋᴄ!", " {target}   ᴛᴍᴋᴄ 🐓!", " {target}   ᴛᴍᴋᴄ 🐔!",
+    " {target}   ᴛᴍᴋᴄ 🐥!", " {target}   ᴛᴍᴋᴄ 🐦!", " {target}   ᴛᴍᴋᴄ 🐈‍⬛ !", " {target}   ᴛᴍᴋᴄ 🐧!",
+    " {target}    ᴛᴍᴋᴄ 🕊️!", " {target}   ᴛᴍᴋᴄ!", " {target}   ᴛᴍᴋᴄ 🦅!", " {target}   ᴛᴍᴋᴄ 🦆!",
+    " {target}   ᴛᴍᴋᴄ 🦢!", " {target}   ᴛᴍᴋᴄ 🦉!", " {target}   ᴛᴍᴋᴄ!", " {target}   ᴛᴍᴋᴄ 🦉!",
+    " {target}   ᴛᴍᴋᴄ 🦚!", " {target}   ᴛᴍᴋᴄ 🦜!", " {target}    ᴛᴍᴋᴄ 💸!", " {target}   ᴛᴍᴋᴄ!",
+    " {target}   ᴛᴍᴋᴄ 🦆!", " {target}   ᴛᴍᴋᴄ 🐸!", " {target}   ᴛᴍᴋᴄ 🐊!", " {target}   ᴛᴍᴋᴄ 🐢!",
+    " {target}   ᴛᴍᴋᴄ 🦎!", " {target}   ᴛᴍᴋᴄ 🐍!", " {target}   ᴛᴍᴋᴄ 🐉!", " {target}   ᴛᴍᴋᴄ 🐲!",
+    " {target}    ᴛᴍᴋᴄ 🦕!", " {target}   ᴛᴍᴋᴄ 🐢!", " {target}   ᴛᴍᴋᴄ 🐋!", " {target}   ᴛᴍᴋᴄ!",
+    " {target}   ᴛᴍᴋᴄ 🐳!", " {target}   ᴛᴍᴋᴄ 🐬!", " {target}   ᴛᴍᴋᴄ 🐟!", " {target}   ᴛᴍᴋᴄ!",
+    " {target}   ᴛᴍᴋᴄ 🐠!", " {target}   ᴛᴍᴋᴄ 🐡!", " {target}    ᴛᴍᴋᴄ 🦈!", " {target}   ᴛᴍᴋᴄ 🦑!",
+    " {target}   ᴛᴍᴋᴄ!", " {target}   ᴛᴍᴋᴄ 🐚!", " {target}   ᴛᴍᴋᴄ 🐚!", " {target}   ᴛᴍᴋᴄ 🐌!",
+    " {target}   ᴛᴍᴋᴄ!", " {target}   ᴛᴍᴋᴄ 🦋!", " {target}   ᴛᴍᴋᴄ 🐌!", " {target}   ᴛᴍᴋᴄ 🎀!",
+    " {target}    ᴛᴍᴋᴄ 🐜!", " {target}   ᴛᴍᴋᴄ 🐝!", " {target}   ᴛᴍᴋᴄ 🐝!", " {target}   ᴛᴍᴋᴄ 🐞!",
+    " {target}   ᴛᴍᴋᴄ 🦗!", " {target}   ᴛᴍᴋᴄ 🏏!", " {target}   ᴛᴍᴋᴄ 🕷️!", " {target}   ᴛᴍᴋᴄ spider!",
+    " {target}   ᴛᴍᴋᴄ 🕸️!", " {target}   ᴛᴍᴋᴄ ♏ !", " {target}    ᴛᴍᴋᴄ 🦟!", "
+{target}   ᴛᴍᴋᴄ!",
+]
+CHUDVILLE_TEXTS = ["───ʜ∆ᴋʟᴇ───(⚪ )","───ʜ∆ᴋʟᴇ───(⚫ )","───ʜ∆ᴋʟᴇ───(🟤)","───ʜ∆ᴋʟᴇ───(🟣)","───ʜ∆ᴋʟᴇ───(🔵)","───ʜ∆ᴋʟᴇ───(🟢)","───ʜ∆ᴋʟᴇ───(🟡)","───ʜ∆ᴋʟᴇ───(🔴)",
+"───ʜ∆ᴋʟᴇ───(🟥)",
+"───ʜ∆ᴋʟᴇ───(🟧)",
+"───ʜ∆ᴋʟᴇ───(🟨)",
+"───ʜ∆ᴋʟᴇ───(🟩)",
+"───ʜ∆ᴋʟᴇ───(🟦)",
+"───ʜ∆ᴋʟᴇ───(🟪)",
+"───ʜ∆ᴋʟᴇ───(🟫)",
+"───ʜ∆ᴋʟᴇ───(⬛ )",
+"───ʜ∆ᴋʟᴇ───(⬜ )"]
+genosspam_TEXTS = [
+    "{target} 𑁍ࠬܓ<🩷>ʟᴀɴᴅ ᴄʜᴏᴏꜱ ɴᴏʀᴍɪᴇ ℘✩₊˚.⋆🕸️ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎
+‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎
+‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎
+‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎
+‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎
+‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎
+‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎
+‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎
+‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎
+‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎
+‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎
+‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎
+‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ {target} 𑁍ࠬܓ<🩷>ʟᴀɴᴅ ᴄʜᴏᴏꜱ ɴᴏʀᴍɪᴇ ℘✩₊˚.⋆🕸️",
+    "{target} 𑁍ࠬܓ<🩵> ɢᴀʀᴇᴇʙ ʀᴀɴᴅɪ ᴋᴇ ʟᴀᴅᴋᴇ🎐𓍼ֶָ֢⊹ ࣪ ˖‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎
+‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎
+‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎
+‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎
+ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎
+‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎
+‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎
+‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎
+‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎
+‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎
+‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎
+‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎
+‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎
+‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎
+‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎
+‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎
+‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎
+‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎
+‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎
+‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎
+‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎{target} 𑁍ࠬܓ<🩵> ɢᴀʀᴇᴇʙ ʀᴀɴᴅɪ ᴋᴇ ʟᴀᴅᴋᴇ🎐𓍼ֶָ֢⊹ ࣪ ˖",
+    "{target} 𑁍ࠬܓ<💛> ᴛᴇʀɪ ᴍᴀ 𝜗𝜚⋆₊˚marco ᴋɪ ꜰᴀɴɢɪʀʟ ˚₊· ‌‌‌‌➳❥ ‎ ‎ ‎ ‎ ‎ ‎ ‎
+‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎
+‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎
+‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎
+‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎
+‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎
+‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎
+‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎
+‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎
+‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎
+‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎
+‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎
+ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎
+‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎
+‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎
+‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎
+‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎
+‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎
+‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎
+‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎
+‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎  ‎ {target} 𑁍ࠬܓ<💛> ᴛᴇʀɪ ᴍᴀ 𝜗𝜚⋆₊˚marco ᴋɪ ꜰᴀɴɢɪʀʟ ˚₊· ‌‌‌‌➳❥",
+    "{target} 𑁍ࠬܓ<🖤>ʜɪᴊᴅᴇ ᴋᴇ ʟᴀᴅᴋᴇ ʀɴᴅ 🎐𓍼ֶָ֢⊹ ࣪ ˖  ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎
+ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎
+‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎
+‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎
+‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎
+‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎
+‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎
+‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎
+‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎
+‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎
+‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎
+‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎
+‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎
+‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎
+‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎
+‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎
+‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎
+‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎
+ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎  ‎ ‎ ‎ ‎ ‎ ‎{target} 𑁍ࠬܓ<🖤>ʜɪᴊᴅᴇ ᴋᴇ ʟᴀᴅᴋᴇ ʀɴᴅ 🎐𓍼ֶָ֢⊹ ࣪ ˖",
+]
+SWIPE_TEXTS = [
+    "{target} SWIPE KENG BANAU RNDI<🩷>",
+    "{target} BAAP BANA LE KENTO KO <🤍>",
+    "{target} RNDI KE LDKE MSG MT KR<🩶>",
+    "{target} HIJDA HAI TU <🖤>",
+    "{target} MA CHUDA LE FER <🤎>",
+    "{target} PEHELE TERI MA KA RATE BATA <💜>",
+    "{target} TERI MA RNDI HAI <💙>",
+    "{target} CHUP KMZR AURAT <🩵>",
+    "{target} CHAMAR HAI TU <💚>",
+    "{target} GND DEGA TO MSG KR <💛>",
+    "{target} MAFIA JAISA RNDI BANEGA <🧡>",
+    "{target} TERI MA MAFIA RNDI <❤️>"
+    ]
+CHUDAI_TEXTS = [
+    "{target} 𝘓𝘈𝘕𝘋 𝘊𝘏𝘖𝘖𝘚 𝘕𝘖𝘙𝘔𝘐𝘌ᯓᡣ𐭩",
+    "{target} 𝘔𝘈 𝘊𝘏𝘜𝘋𝘈 𝘔𝘜𝘑𝘏𝘌 𝘒𝘠𝘈 𐙚⋆°🦢｡⋆♡",
+    "{target} 𝘉𝘖𝘙𝘐𝘕𝘎 𝘉𝘠 𝘛𝘌𝘙𝘐 𝘔𝘈 𝘊𝘏𝘖𝘋𝘕𝘌 𝘑𝘈 𝘙𝘏𝘈 ˚.🎀༘⋆",
+    "{target} 𝘙𝘈𝘕𝘋𝘈𝘓 MARCO 𝘗𝘈𝘗𝘈 𝘉𝘖𝘓𓂃 ࣪˖ ִֶཐི༏ཋྀ",
+    "{target} 𝘈𝘜𝘒𝘈𝘛 𝘉𝘈𝘕𝘈 𝘚𝘈𝘔𝘕𝘌 𝘒𝘏𝘈𝘋𝘌 𝘏𝘖𝘕𝘌 𝘒𝘈⋆｡‧˚ʚ🍓ɞ˚‧｡⋆",
+    "{target} MARCO 𝘒𝘖 𝘉𝘈𝘈𝘗 𝘉𝘈𝘕𝘈 𝘉𝘈𝘊𝘏 𝘑𝘈𝘠𝘈𝘎𝘈 ⋆˚𝜗𝜚˚⋆",
+    "{target} 𝘔𝘈𝘍𝘐𝘈 𝘑𝘈𝘐𝘚𝘈 𝘊𝘏𝘜𝘋𝘌𝘎𝘈 𝘛𝘜 𝘉𝘏𝘐 ₊˚⊹ ᰔ",
+]
+MONEYTALK_TEXTS = [
+    "{target}   [𝙍𝘼𝙉𝘿𝙄] ₰ ────(🤍)", "{target}   [𝙍𝘼𝙉𝘿𝙄] ₪ ────(🤍)",
+"{target}   [𝙍𝘼𝙉𝘿𝙄] ₦ ────(🤍)",
+    "{target}   [𝙍𝘼𝙉𝘿𝙄] ₤ ────(🤍)", "{target}   [𝙍𝘼𝙉𝘿𝙄] ৳ ────(🤍)",
+"{target}   [𝙍𝘼𝙉𝘿𝙄] Ұ ────(🤍)",
+    "{target}   [𝙍𝘼𝙉𝘿𝙄] ✯ ────(🤍)", "{target}   [𝙍𝘼𝙉𝘿𝙄] ₫ ────(🤍)",
+"{target}   [𝙍𝘼𝙉𝘿𝙄] ₴ ────(🤍)",
+    "{target}   [𝙍𝘼𝙉𝘿𝙄] ₫ ────(🤍)"
+]
+# ---------------------------
+# STATE
+# ---------------------------
+SUDO_USERS = {OWNER_ID}
+GLOBAL_DELAY = 0.1
+if os.path.exists(SUDO_FILE):
     try:
-        with open('csrf.txt', 'r') as file:
-            parts = file.read().strip().split("|")
-            if len(parts) == 2:
-                csrf, lsd = parts
-                if csrf and lsd:
-                    return csrf, lsd
-    except Exception:
-        pass
-    return 'a_NeUPw6QMbv8iODfpVu4P', ''.join(random.choices(string.ascii_letters + string.digits, k=32))
-
-def _tl():
-	while True:
-		url = "https://accounts.google.com/_/signup/validatepersonaldetails"
-		params = {
-		  'hl': "en-GB",
-		  '_reqid': "175506",
-		  'rt': "j"
-		}
-		payload = {
-		  'continue': "https://accounts.google.com/ManageAccount?nc=1",
-		  'f.req': "[\"AEThLlxX_6_JWyBbfSjS4gh-7dfRG0Faq_JYJauTSE18UDIsOOSh4Dfb-6njcSveOB_pxHB4AHaX\",null,null,null,null,0,0,\"aesowns\",\"aesowns\",null,0,null,1,[],1]",
-		  'azt': "AFoagUVc9c_uUJzRK6e32dUB8FxCEfRxWw:1775834837829",
-		  'cookiesDisabled': "false",
-		  'deviceinfo': "[null,null,null,null,null,\"IN\",null,null,null,\"GlifWebSignIn\",null,[],null,null,null,null,1,null,0,1,\"\",null,null,2,2,2]",
-		  'gmscoreversion': "null",
-		  'flowName': "GlifWebSignIn",
-		  'checkConnection': "youtube:275",
-		  'checkedDomains': "youtube",
-		  'pstMsg': "1",
-		  '': ""
-		}
-		headers = {
-		  'User-Agent': "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36",
-		  'sec-ch-ua': "\"Chromium\";v=\"139\", \"Not;A=Brand\";v=\"99\"",
-		  'x-same-domain': "1",
-		  'sec-ch-ua-mobile': "?1",
-		  'sec-ch-ua-arch': "\"\"",
-		  'sec-ch-ua-full-version': "\"139.0.7339.0\"",
-		  'sec-ch-ua-platform-version': "\"14.0.0\"",
-		  'google-accounts-xsrf': "1",
-		  'sec-ch-ua-full-version-list': "\"Chromium\";v=\"139.0.7339.0\", \"Not;A=Brand\";v=\"99.0.0.0\"",
-		  'sec-ch-ua-bitness': "\"\"",
-		  'sec-ch-ua-model': "\"SM-A235F\"",
-		  'sec-ch-ua-wow64': "?0",
-		  'sec-ch-ua-platform': "\"Android\"",
-		  'x-chrome-connected': "source=Chrome,eligible_for_consistency=true",
-		  'origin': "https://accounts.google.com",
-		  'x-client-data': "CKr5ygE=",
-		  'sec-fetch-site': "same-origin",
-		  'sec-fetch-mode': "cors",
-		  'sec-fetch-dest': "empty",
-		  'referer': "https://accounts.google.com/createaccount?flowName=GlifWebSignIn&flowEntry=ServiceLogin",
-		  'accept-language': "en-IN,en-GB;q=0.9,en-US;q=0.8,en;q=0.7",
-		  'Cookie': "__Secure-BUCKET=CMwC; OTZ=8543056_34_34__34_; AEC=AaJma5sh5Uq_rpZAZjJpsyFnwoQAa6YPSCrR0QvVqOBFIuPIuNiItAkijg; __Host-GAPS=1:ceVBeIFat0cbzvdLBAhni7g-f72sXdKjlI2jPd0jGZtXTjwvNKnGgY25OJx3pD64BDpzIVQdK1Jr9KG4cCpFpQ7wGl94Vw:gK75A7sOf642Bile; SEARCH_SAMESITE=CgQIyaAB; ACCOUNT_CHOOSER=AFx_qI4M-DE-i8uw9Y6c1L1zrzdgEFNNcaNBKBNvPFtQWar0n8lm98sIGfCxG4K-_KxUu8G8hQ1M; NID=530=ZdZHakrMFroO9fLgt3UAT3RVHBXX3u4DwdZiixVDIqd0YxjNKVkh6CtoHUgUiKvL4jLJxdYzbWfsdvzEY2CnBF3jOgfh9vZN0oX9A_r9aZoGwpod5PeOFOBghlPRl_NlO04_NkKxOpefi_x03pl0EdTa6iCMfowhhXB8EVKlFmNMWoQbOIlBbBhRQXq3FuPK0DAqbZLvsTSKWCZgOl3FaYyvSDVTLVeO3p844rZAJRjuy0eD3IxN6Fof18F3r39OCp49P4QGP8gL4ed--GY7lRFouL8Mazj3isVNxNsu6rYV0bHWN2FSehWqYiZ0ugAeeNBNtZygw66aiAmgrs0HgO-PmEd3BHwBdb3hoAOS8W2OBCTgaOnFKa0DpWSirPgJXYW-zE28mMzLPrfFkoISlTVA01GE8evmM95-rgxCCDtxNsRJATvjWNeydvzWSsmthgCx7vUu9a3EA_G3V_-bew"
-		}
-		response = _session.post(url, params=params, data=payload, headers=headers, timeout=20	)
-		tl1 = json.loads(response.text[5:])[0][1][2]
-		url = "https://accounts.google.com/_/signup/validatebasicinfo"
-		params = {
-		  'hl': "en-GB",
-		  'TL': tl1,
-		  '_reqid': "475506",
-		  'rt': "j"
-		}
-		payload = {
-		  'continue': "https://accounts.google.com/ManageAccount?nc=1",
-		  'f.req': "[\"TL:"+ tl1 +"\",2015,3,5,2,null,null,0,null,null,0,0]",
-		  'azt': "AFoagUVc9c_uUJzRK6e32dUB8FxCEfRxWw:1775834837829",
-		  'cookiesDisabled': "false",
-		  'deviceinfo': "[null,null,null,null,null,\"IN\",null,null,null,\"GlifWebSignIn\",null,[],null,null,null,null,1,null,0,1,\"\",null,null,2,2,2]",
-		  'gmscoreversion': "null",
-		  'flowName': "GlifWebSignIn",
-		  'checkConnection': "youtube:275",
-		  'checkedDomains': "youtube",
-		  'pstMsg': "1",
-		  '': ""
-		}
-		headers = {
-		  'User-Agent': "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36",
-		  'sec-ch-ua': "\"Chromium\";v=\"139\", \"Not;A=Brand\";v=\"99\"",
-		  'x-same-domain': "1",
-		  'sec-ch-ua-mobile': "?1",
-		  'sec-ch-ua-arch': "\"\"",
-		  'sec-ch-ua-full-version': "\"139.0.7339.0\"",
-		  'sec-ch-ua-platform-version': "\"14.0.0\"",
-		  'google-accounts-xsrf': "1",
-		  'sec-ch-ua-full-version-list': "\"Chromium\";v=\"139.0.7339.0\", \"Not;A=Brand\";v=\"99.0.0.0\"",
-		  'sec-ch-ua-bitness': "\"\"",
-		  'sec-ch-ua-model': "\"SM-A235F\"",
-		  'sec-ch-ua-wow64': "?0",
-		  'sec-ch-ua-platform': "\"Android\"",
-		  'x-chrome-connected': "source=Chrome,eligible_for_consistency=true",
-		  'origin': "https://accounts.google.com",
-		  'x-client-data': "CKr5ygE=",
-		  'sec-fetch-site': "same-origin",
-		  'sec-fetch-mode': "cors",
-		  'sec-fetch-dest': "empty",
-		  'referer': "https://accounts.google.com/signup/v2/birthdaygender?flowName=GlifWebSignIn&flowEntry=ServiceLogin&TL="+ tl1,
-		  'accept-language': "en-IN,en-GB;q=0.9,en-US;q=0.8,en;q=0.7",
-		  'Cookie': "__Secure-BUCKET=CMwC; OTZ=8543056_34_34__34_; AEC=AaJma5sh5Uq_rpZAZjJpsyFnwoQAa6YPSCrR0QvVqOBFIuPIuNiItAkijg; __Host-GAPS=1:ceVBeIFat0cbzvdLBAhni7g-f72sXdKjlI2jPd0jGZtXTjwvNKnGgY25OJx3pD64BDpzIVQdK1Jr9KG4cCpFpQ7wGl94Vw:gK75A7sOf642Bile; SEARCH_SAMESITE=CgQIyaAB; ACCOUNT_CHOOSER=AFx_qI4M-DE-i8uw9Y6c1L1zrzdgEFNNcaNBKBNvPFtQWar0n8lm98sIGfCxG4K-_KxUu8G8hQ1M; NID=530=ZdZHakrMFroO9fLgt3UAT3RVHBXX3u4DwdZiixVDIqd0YxjNKVkh6CtoHUgUiKvL4jLJxdYzbWfsdvzEY2CnBF3jOgfh9vZN0oX9A_r9aZoGwpod5PeOFOBghlPRl_NlO04_NkKxOpefi_x03pl0EdTa6iCMfowhhXB8EVKlFmNMWoQbOIlBbBhRQXq3FuPK0DAqbZLvsTSKWCZgOl3FaYyvSDVTLVeO3p844rZAJRjuy0eD3IxN6Fof18F3r39OCp49P4QGP8gL4ed--GY7lRFouL8Mazj3isVNxNsu6rYV0bHWN2FSehWqYiZ0ugAeeNBNtZygw66aiAmgrs0HgO-PmEd3BHwBdb3hoAOS8W2OBCTgaOnFKa0DpWSirPgJXYW-zE28mMzLPrfFkoISlTVA01GE8evmM95-rgxCCDtxNsRJATvjWNeydvzWSsmthgCx7vUu9a3EA_G3V_-bew"
-		}
-		response = _session.post(url, params=params, data=payload, headers=headers, timeout=20)
-		tl2 = json.loads(response.text[5:])[0][0][4].split("TL:")[1]
-		with open("tl.txt", "w") as ok:
-			ok.write(tl2)
-Thread(target=_tl, daemon=True).start()
-
-def _reset(email):
-	global bad, good
-	url = "https://i.instagram.com/api/v1/bloks/async_action/com.bloks.www.caa.ar.search.async/"
-	device = str(uuid.uuid4())
-	family = str(uuid.uuid4())
-	android = "android-" + secrets.token_hex(8)
-	payload = {
-	  'params': "{\"client_input_params\":{\"aac\":\"{\\\"aac_init_timestamp\\\":"+ str(int(time.time())) +",\\\"aacjid\\\":\\\""+ str(uuid.uuid4()) +"\\\",\\\"aaccs\\\":\\\""+ secrets.token_urlsafe(32) +"\\\"}\",\"flash_call_permissions_status\":{\"READ_PHONE_STATE\":\"PERMANENTLY_DENIED\",\"READ_CALL_LOG\":\"DENIED\",\"ANSWER_PHONE_CALLS\":\"DENIED\"},\"was_headers_prefill_available\":0,\"network_bssid\":null,\"sfdid\":\"\",\"fetched_email_token_list\":{},\"search_query\":\""+ email +"\",\"auth_secure_device_id\":\"\",\"ig_oauth_token\":[],\"cloud_trust_token\":null,\"was_headers_prefill_used\":0,\"sso_accounts_auth_data\":[],\"encrypted_msisdn\":\"\",\"device_network_info\":null,\"text_input_id\":\"akyuf0:61\",\"zero_balance_state\":null,\"android_build_type\":\"release\",\"accounts_list\":[],\"is_oauth_without_permission\":0,\"ig_android_qe_device_id\":\""+ device +"\",\"gms_incoming_call_retriever_eligibility\":\"client_not_supported\",\"search_screen_type\":\"email_or_username\",\"is_whatsapp_installed\":1,\"lois_settings\":{\"lois_token\":\"\"},\"ig_vetted_device_nonce\":null,\"headers_infra_flow_id\":\"\",\"fetched_email_list\":[]},\"server_params\":{\"event_request_id\":\""+ str(uuid.uuid4()) +"\",\"is_from_logged_out\":0,\"layered_homepage_experiment_group\":null,\"device_id\":\""+ android +"\",\"login_surface\":\"login_home\",\"waterfall_id\":\""+ str(uuid.uuid4()) +"\",\"INTERNAL__latency_qpl_instance_id\":6.3987980400102E13,\"is_platform_login\":0,\"context_data\":\"\",\"login_entry_point\":\"logged_out\",\"INTERNAL__latency_qpl_marker_id\":36707139,\"family_device_id\":\""+ family +"\",\"offline_experiment_group\":\"caa_iteration_v3_perf_ig_4\",\"access_flow_version\":\"pre_mt_behavior\",\"is_from_logged_in_switcher\":0,\"qe_device_id\":\""+ device +"\"}}",
-	  'bk_client_context': "{\"bloks_version\":\"5e47baf35c5a270b44c8906c8b99063564b30ef69779f3dee0b828bee2e4ef5b\",\"styles_id\":\"instagram\"}",
-	  'bloks_versioning_id': "5e47baf35c5a270b44c8906c8b99063564b30ef69779f3dee0b828bee2e4ef5b"
-	}
-	headers = {
-	  'User-Agent': "Instagram 370.1.0.43.96 Android (34/14; 450dpi; 1080x2207; samsung; SM-A235F; a23; qcom; en_IN; 704872281)",
-	  'accept-language': "en-IN, en-US",
-	  'x-bloks-version-id': "5e47baf35c5a270b44c8906c8b99063564b30ef69779f3dee0b828bee2e4ef5b",
-	  'x-fb-friendly-name': "IgApi: bloks/async_action/com.bloks.www.caa.ar.search.async/",
-	  'x-ig-android-id': android,
-	  'x-ig-app-id': "567067343352427",
-	  'x-ig-app-locale': "en_IN",
-	  'x-ig-client-endpoint': "com.bloks.www.caa.ar.search",
-	  'x-ig-device-id': device,
-	  'x-ig-family-device-id': family,
-	  'x-ig-timezone-offset': str(datetime.now().astimezone().utcoffset().total_seconds()),
-	  'x-mid': base64.urlsafe_b64encode(secrets.token_bytes(18)).decode().rstrip('='),
-	  'x-pigeon-rawclienttime': str(time.time()),
-	  'x-pigeon-session-id': f"UFS-{uuid.uuid4()}-0",
-	}
-	response = requests.post(url, data=payload, headers=headers, timeout=20)
-	if f"{email}" in response.text:
-		good+=1
-		dis()
-		_check(email)
-	elif 'Sorry, something' in response.text:
-		limit+=1
-		dis()
-	else:
-		bad+=1
-		dis()
-
-def _check(email):
-	global hits, taken
-	usr = email.split("@")[0]
-	with open("tl.txt", "r") as ys:
-		tl = ys.read().strip()
-	url = "https://accounts.google.com/_/signup/usernameavailability"
-	params = {
-	  'hl': "en-GB",
-	  'TL': tl,
-	  '_reqid': "675506",
-	  'rt': "j"
-	}
-	payload = {
-	  'continue': "https://accounts.google.com/ManageAccount?nc=1",
-	  'f.req': "[\"TL:"+ tl +"\",\""+ usr +"\",0,0,1,null,1,321862]",
-	  'azt': "AFoagUVc9c_uUJzRK6e32dUB8FxCEfRxWw:1775834837829",
-	  'cookiesDisabled': "false",
-	  'deviceinfo': "[null,null,null,null,null,\"IN\",null,null,null,\"GlifWebSignIn\",null,[],null,null,null,null,1,null,0,1,\"\",null,null,2,2,2]",
-	  'gmscoreversion': "null",
-	  'flowName': "GlifWebSignIn",
-	  'checkConnection': "youtube:275",
-	  'checkedDomains': "youtube",
-	  'pstMsg': "1",
-	  '': ""
-	}
-	headers = {
-	  'User-Agent': "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36",
-	  'sec-ch-ua': "\"Chromium\";v=\"139\", \"Not;A=Brand\";v=\"99\"",
-	  'x-same-domain': "1",
-	  'sec-ch-ua-mobile': "?1",
-	  'sec-ch-ua-arch': "\"\"",
-	  'sec-ch-ua-full-version': "\"139.0.7339.0\"",
-	  'sec-ch-ua-platform-version': "\"14.0.0\"",
-	  'google-accounts-xsrf': "1",
-	  'sec-ch-ua-full-version-list': "\"Chromium\";v=\"139.0.7339.0\", \"Not;A=Brand\";v=\"99.0.0.0\"",
-	  'sec-ch-ua-bitness': "\"\"",
-	  'sec-ch-ua-model': "\"SM-A235F\"",
-	  'sec-ch-ua-wow64': "?0",
-	  'sec-ch-ua-platform': "\"Android\"",
-	  'x-chrome-connected': "source=Chrome,eligible_for_consistency=true",
-	  'origin': "https://accounts.google.com",
-	  'x-client-data': "CKr5ygE=",
-	  'sec-fetch-site': "same-origin",
-	  'sec-fetch-mode': "cors",
-	  'sec-fetch-dest': "empty",
-	  'referer': "https://accounts.google.com/signup/v2/createusername?flowName=GlifWebSignIn&flowEntry=ServiceLogin&TL="+ tl,
-	  'accept-language': "en-IN,en-GB;q=0.9,en-US;q=0.8,en;q=0.7",
-	  'Cookie': "__Secure-BUCKET=CMwC; OTZ=8543056_34_34__34_; AEC=AaJma5sh5Uq_rpZAZjJpsyFnwoQAa6YPSCrR0QvVqOBFIuPIuNiItAkijg; __Host-GAPS=1:ceVBeIFat0cbzvdLBAhni7g-f72sXdKjlI2jPd0jGZtXTjwvNKnGgY25OJx3pD64BDpzIVQdK1Jr9KG4cCpFpQ7wGl94Vw:gK75A7sOf642Bile; SEARCH_SAMESITE=CgQIyaAB; ACCOUNT_CHOOSER=AFx_qI4M-DE-i8uw9Y6c1L1zrzdgEFNNcaNBKBNvPFtQWar0n8lm98sIGfCxG4K-_KxUu8G8hQ1M; NID=530=ZdZHakrMFroO9fLgt3UAT3RVHBXX3u4DwdZiixVDIqd0YxjNKVkh6CtoHUgUiKvL4jLJxdYzbWfsdvzEY2CnBF3jOgfh9vZN0oX9A_r9aZoGwpod5PeOFOBghlPRl_NlO04_NkKxOpefi_x03pl0EdTa6iCMfowhhXB8EVKlFmNMWoQbOIlBbBhRQXq3FuPK0DAqbZLvsTSKWCZgOl3FaYyvSDVTLVeO3p844rZAJRjuy0eD3IxN6Fof18F3r39OCp49P4QGP8gL4ed--GY7lRFouL8Mazj3isVNxNsu6rYV0bHWN2FSehWqYiZ0ugAeeNBNtZygw66aiAmgrs0HgO-PmEd3BHwBdb3hoAOS8W2OBCTgaOnFKa0DpWSirPgJXYW-zE28mMzLPrfFkoISlTVA01GE8evmM95-rgxCCDtxNsRJATvjWNeydvzWSsmthgCx7vUu9a3EA_G3V_-bew"
-	}
-	response = _session.post(url, params=params, data=payload, headers=headers, timeout=20)
-	if '"gf.uar",1' in response.text:
-		hits+=1
-		dis()
-		gmail = _mail(usr)
-		_send(token, id, gmail, usr, email)
-	else:
-		taken+=1
-		dis()
-		
-def _mail(query):
-	url = "https://www.instagram.com/api/graphql"
-	payload = {
-	  'av': "0",
-	  '__d': "www",
-	  '__user': "0",
-	  '__a': "1",
-	  '__req': "m",
-	  '__hs': "20559.HYP:instagram_web_pkg.2.1...0",
-	  'dpr': "3",
-	  '__ccg': "GOOD",
-	  '__rev': "1037474223",
-	  '__s': "69xtbb:57pqmb:p793b1",
-	  '__hsi': "7629310293526472042",
-	  '__dyn': "7xeUmwlEnwn8K2Wmh0no6u5U4e0yoW3q32360CEbo1nEhw2nVE4W0qa0FE2awt81s8hwnU6a3a1YwBgao6C0Mo2swlo5q4U2zxe2GewGw9a361qw8Xwn8e87q0oa2-azo7u3u2C2O0Lo6-3u2WE5B0bK1Iwqo5p0qZ6goK10xKi2K7E5y2-1mwa6byohw5ywuU1FU",
-	  '__csr': "n7inkrNr3L3BihYDAtilph4rifqb9kVZ9p4HDxmFuEFAFaAvkKQhFaLV96jGJbQNkWlsyihkjpqiWTOCclqiaydOjTHQV5UyBmWkJJ5jUhx6DUSFpWWlBKu4VSFojHWnQfU9qm8CU898lUghoSE8op-axaUyUiy88ogxCdG4Wx6m5EixySbyoqwBxu5o5y0bWw3Bo3dwyDTkSjei00lgO3uii08_a0je2a68fo2bw3iOw2Yo5q5E0qcw3Sh0HwEgaUuQ0m2vo1mQ5o1RU2AwSU74U6i9yJ1B0WoswiE1JU0WW480fc8060y",
-	  '__hsdp': "goA0zwkkye9pFqauqkI88OYkAeyE8BU2pg2owiUarxJ8EKQE_gdxOxsUeEB3Ci1eceg08do0uhw2Q40p61lw1aa5E",
-	  '__hblp': "05Z-0CE2ow_yU560xU4eu18xW6oqwg8nxC15wr8e85-3i1xxC1Qw27oeE0Ja09rw2eEaUtw7cWo24wlUf82SxK5o2uws80yS1lw2jU11U9o198mxi3u5U2Awbq",
-	  '__sjsp': "goA0zwkkye9pFqauqkI89QLb8AeyE8_w4PwiUarxJ8EKQE_gdxOxsUeEB3Ci1eceg",
-	  '__comet_req': "7",
-	  'lsd': "AdTJ7wTIMmb3YP_Es7VsRqEhWXo",
-	  'jazoest': "22347",
-	  '__spin_r': "1037474223",
-	  '__spin_b': "trunk",
-	  '__spin_t': "1776337226",
-	  '__crn': "comet.igweb.PolarisCAAIGAccountRecoverySearchRoute",
-	  'qpl_active_flow_ids': "516759801",
-	  'fb_api_caller_class': "RelayModern",
-	  'fb_api_req_friendly_name': "CAAIGAccountSearchViewQuery",
-	  'server_timestamps': "true",
-	  'variables': "{\"params\":{\"event_request_id\":\"0b07511d-476d-4b4c-ae3a-45fd805ad854\",\"next_uri\":\"\",\"search_query\":\""+ query +"\",\"waterfall_id\":\"005e7dbf-c78a-4908-9083-3803b1d3f42d\"}}",
-	  'doc_id': "26178667145161478",
-	  'fb_api_analytics_tags': "[\"qpl_active_flow_ids=516759801\"]"
-	}
-	headers = {
-	  'User-Agent': "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36",
-	  'sec-ch-ua': "\"Chromium\";v=\"139\", \"Not;A=Brand\";v=\"99\"",
-	  'sec-ch-ua-model': "\"\"",
-	  'x-ig-app-id': "936619743392459",
-	  'sec-ch-ua-mobile': "?0",
-	  'x-fb-friendly-name': "CAAIGAccountSearchViewQuery",
-	  'x-fb-lsd': "AdTJ7wTIMmb3YP_Es7VsRqEhWXo",
-	  'sec-ch-ua-platform-version': "\"\"",
-	  'x-asbd-id': "359341",
-	  'sec-ch-ua-full-version-list': "\"Chromium\";v=\"139.0.7339.0\", \"Not;A=Brand\";v=\"99.0.0.0\"",
-	  'sec-ch-prefers-color-scheme': "dark",
-	  'x-csrftoken': "bKPOnxXALzrHjjhgVUSXUWvsJSheI52L",
-	  'sec-ch-ua-platform': "\"Linux\"",
-	  'origin': "https://www.instagram.com",
-	  'sec-fetch-site': "same-origin",
-	  'sec-fetch-mode': "cors",
-	  'sec-fetch-dest': "empty",
-	  'referer': "https://www.instagram.com/accounts/password/reset/",
-	  'accept-language': "en-IN,en-GB;q=0.9,en-US;q=0.8,en;q=0.7",
-	  'Cookie': "datr=N8-qacv2GfIwdA8nKYODJ03a; ig_did=CF4EB49B-2DE0-49C5-B358-6B71B7793D06; mid=aarPOQAEAAGKchdotUBpy5AbIclH; ig_nrcb=1; ps_l=1; ps_n=1; rur=\"HIL\\0545636887483\\0541807873223:01fe3f5bbc1220e0674754bce6873ff6ade2dc7787b679d5c2ac93b1dd18d6aba48861f6\"; csrftoken=bKPOnxXALzrHjjhgVUSXUWvsJSheI52L; wd=774x749"
-	}
-	response = requests.post(url, data=payload, headers=headers, timeout=20)
-	email = next((i["contact_point"] for i in response.json() ["data"]["caa_ar_ig_account_search"]["contact_points"] if i["type"] == "EMAIL"), None)
-	if email:
-		return email
-	else:
-		return None
-
-def _send(token, id, gmail, usr, email):
-		username = usr
-		data = info.get(username, {})
-		business = data.get('is_business', None)
-		followers = data.get('follower_count', None)
-		followings = data.get('following_count', None)
-		posts = data.get('media_count', None) or 0
-		private = data.get('is_private', None)
-		name = data.get('full_name', None)
-		biography = data.get('biography', None)
-		business = business if business is not None else 'None'
-		followers = followers if followers is not None else 'None'
-		followings = followings if followings is not None else 'None'
-		private = private if private is not None else 'None'
-		name = name if name is not None else 'None'
-		biography = biography if biography is not None else 'None'
-		if gmail:
-			mail = gmail
-		else:
-			mail = 'None'
-		if posts > 2:
-			meta = 'True'
-		else:
-			meta = 'False'
-		try:
-			content = f"""
-╔═════════════════════════╗
-  𝗕𝗨𝗦𝗜𝗡𝗘𝗦𝗦 ➜ {business}
-  𝗠𝗘𝗧𝗔 ➜ {meta}
-  𝗡𝗔𝗠𝗘 ➜ {name}
-  𝗨𝗦𝗘𝗥𝗡𝗔𝗠𝗘 ➜ @{username}
-  𝗙𝗢𝗟𝗟𝗢𝗪𝗘𝗥𝗦 ➜ {followers}
-  𝗙𝗢𝗟𝗟𝗢𝗪𝗜𝗡𝗚 ➜ {followings}
-  𝗣𝗢𝗦𝗧𝗦 ➜ {posts}
-  𝗕𝗜𝗢 ➜ {biography}
-  𝗚𝗠𝗔𝗜𝗟 ➜ {email}
-  𝗔𝗧𝗧𝗔𝗖𝗛𝗘𝗗 𝗠𝗔𝗜𝗟 ➜ {mail}
-  𝗨𝗥𝗟 ➜ https://www.instagram.com/{username}
-  
-  𝗧𝗢𝗢𝗟 ➜ @ceveity
-╚═════════════════════════╝
-"""
-			response = requests.post(f"https://api.telegram.org/bot{token}/sendMessage?chat_id={id}&text={content}", timeout=20)
-		except:
-			with open('HitsZ.txt', 'a') as a:
-				a.write(f'{content}\n')
-
-def users():
-    global email
+        with open(SUDO_FILE, "r") as f: SUDO_USERS.update(int(x) for x in json.load(f))
+    except: pass
+group_tasks = {}
+bots_data = [] # Stores dicts with bot_id and token
+logging.basicConfig(level=logging.INFO)
+# ---------------------------
+# HELPERS
+# ---------------------------
+def only_sudo(func):
+    async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not update.effective_user or update.effective_user.id not in SUDO_USERS:
+            await update.message.reply_text("ɢᴇɴᴏs ᴋɪ ɢᴜʟᴀᴍɪ ᴋʀ ᴘʜʟᴇ👺")
+            return
+        return await func(update, context)
+    return wrapper
+async def bot_loop(bot, chat_id, base, mode, reply_to_id=None):
+    i = 0
+    current_delay = GLOBAL_DELAY
+    if mode in ["nextgen", "moneytalk"]:
+        current_delay = 0.05 # Start even faster for competitive modes
+    mapping = {
+        "raid": RAID_TEXTS, "ncemo": NCEMO_EMOJIS, "mulla": mulla_TEXTS,
+        "mulla2": mulla2_TEXTS, "drags": DRAGS_TEXTS, "ncbaap": NCBAAP_TEXTS,
+        "rehand": REHAND_TEXTS, "heartloop": HEART_EMOJIS, "animal": ANIMAL_EMOJIS,
+        "mask": MASK_EMOJIS, "flownc": FLOWNC_TEXTS, "choco": CHOCO_EMOJIS,
+        "allin1": allin1_TEXTS, "genosspam": genosspam_TEXTS, "ncloop": RAID_TEXTS,
+        "swipe": SWIPE_TEXTS, "chudai": CHUDAI_TEXTS, "nextgen": NEXTGEN_TEXTS,
+        "moneytalk": MONEYTALK_TEXTS, "chudville": CHUDVILLE_TEXTS
+    }
+    text_list = mapping.get(mode, NCEMO_EMOJIS)
+    last_chat_title = None
     while True:
-        csrf, lsd = _load()
-        cookies = {
-            'rur': '"HIL\\0545636887483\\0541807071850:01fe8123393d804e894598313ace5310cccf24a15f4f219ea4e2a73424529c30f51eb908"'
-        }
-        headers = {
-            'User-Agent': UA(),
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'x-bloks-version-id': "f0fd53409d7667526e529854656fe20159af8b76db89f40c333e593b51a2ce10",
-            'x-ig-app-id': '936619743392459',
-            'x-fb-lsd': lsd,
-            'sec-ch-prefers-color-scheme': 'light',
-            'x-csrftoken': csrf,
-            'sec-ch-ua-platform': '"Android"',
-            'origin': 'https://www.instagram.com',
-            'sec-fetch-site': 'same-origin'
-        }
-        payload = {
-            'lsd': lsd,
-            'variables': json.dumps({"userID": random.randint(2500000000, 21254029834), "username": "cristiano"}),
-            'doc_id': '7717269488336001',
-        }
-        response = session.post('https://www.instagram.com/api/graphql', headers=headers, data=payload, cookies=cookies, timeout=20)
         try:
-            username = response.json().get('data', {}).get('user', {}).get('username', {})
-            followers = response.json().get('data', {}).get('user', {}).get('follower_count', {})
-            id = response.json().get('data', {}).get('user', {}).get('pk', {})
-            if username and id and followers and followers > 20:
-                info[username] = response.json().get('data', {}).get('user', {})
-                email = username + '@gmail.com'
-                _reset(email)
-        except:
-            pass
-with ThreadPoolExecutor(max_workers=100) as executor:
-    for _ in range(200):
-        executor.submit(users)
+            # Smart speed adjustment for nextgen/moneytalk
+            if mode in ["nextgen", "moneytalk"]:
+                try:
+                    current_chat = await bot.get_chat(chat_id)
+                    # If someone else changed the title, decrease delay (increase speed)
+                    if last_chat_title and current_chat.title != last_chat_title:
+                        # Drastic speed increase on interference
+                        current_delay = max(0.001, current_delay * 0.5)
+                    last_chat_title = current_chat.title
+                except Exception:
+                    pass
+            raw = text_list[i % len(text_list)]
+            txt = raw.replace("{target}", base) if "{target}" in raw else f"{base} {raw}"
+            if mode == "chudai":
+                await asyncio.gather(
+                    bot.send_message(chat_id, txt, reply_to_message_id=reply_to_id),
+                    bot.set_chat_title(chat_id, txt)
+                )
+            elif mode == "genosspam" or mode == "swipe":
+                await bot.send_message(chat_id, txt, reply_to_message_id=reply_to_id)
+            elif mode in ["nextgen", "moneytalk", "ncloop", "ncemo", "mulla", "mulla2", "drags", "ncbaap", "rehand", "heartloop", "animal", "mask", "flownc", "choco", "allin1", "chudville"]:
+                await bot.set_chat_title(chat_id, txt)
+                last_chat_title = txt # Update our expected title after we set it
+            else:
+                await bot.send_message(chat_id, txt)
+            i = (i + 1) % len(text_list)
+            # Use the dynamic delay for nextgen/moneytalk, otherwise use global
+            await asyncio.sleep(current_delay if mode in ["nextgen", "moneytalk"] else GLOBAL_DELAY)
+        except Exception as e:
+            await asyncio.sleep(0.5) # Reduced retry delay for faster recovery
+# -----------------------------
+# HANDLERS
+# -----------------------------
+@only_sudo
+async def start_cmd(update, context):
+    """
+    FIX: Renamed from 'start' to 'start_cmd' to match your main loop.
+    This solves the 'name start_cmd is not defined' error.
+    """
+    await update.message.reply_text("🚀 𝐇𝐀𝐓𝐄𝐑 𝐊𝐈 𝐌𝐊𝐂 ! 𝐘𝐄𝐀𝐇𝐇!!")
+@only_sudo
+async def help_cmd(update, context):
+    """
+    FIX: Separated this from the jumbled line above and fixed indentation.
+    """
+    photo_path = "328687.jpg"
+    caption_text = (
+           "★  SCRIPT 𝗕𝗬 X★\n\n"
+        "PROXY  2.0 𝐁𝐎𝐓\n\n"
+        "--------------------------\n"
+        "★ NAME LOOPS ★\n"
+        "--------------------------\n\n"
+        "/ncloop  - RAID LOOPS\n"
+        "/ncemo   - EMO LOOPS\n"
+        "/mulla - RND LOOP\n"
+        "/mulla2 - MAX NC\n"
+        "/drags   - WORLS\n"
+        "/ncbaap  - MIX LOOPS\n"
+        "/boync  - BOY NC\n"
+        "/genosspam - SPAM\n"
+        "/swipe   - SLIDESHOW\n"
+        "/chudai  - SWIPE + NC\n"
+        "/heartloop  - HEART NC\n"
+        "/animal  - ANIMAL NC\n"
+        "/mask  - MASK NC\n"
+        "/flownc  - FLOWER NC\n"
+        "/choco  - CHOCO NC\n"
+        "/allin1  - ALL IN ONE NC\n"
+        "----------*----------\n"
+        "★ X 𝐒𝐏𝐄𝐂𝐈𝐀𝐋 ★\n"
+        "----------*----------\n\n"
+        "/nextgen - FAST TITLE\n"
+        "/moneytalk - MONEY MODE\n"
+        "/chudville - TITLE LOOP\n\n"
+        "----------*----------\n"
+        "/stopall - STOP TASK\n"
+        "/status  - ACTIVE TASKS\n"
+        "/delay   - SPEED CONTROL\n\n"
+        "----------*----------\n"
+        "X SCRIPT\n"
+        "----------*----------"
+    )
+    try:
+        await update.message.reply_photo(photo=open(photo_path, "rb"), caption=caption_text)
+    except Exception:
+        await update.message.reply_text(caption_text)
+@only_sudo
+async def stopall(update, context):
+    cid = update.message.chat_id
+    if cid in group_tasks:
+        for t in group_tasks[cid].values(): t.cancel()
+        group_tasks[cid] = {}
+    await update.message.reply_text("🛑 DEACTIVATE .")
+@only_sudo
+async def addsudo(update, context):
+    if not update.message.reply_to_message:
+        return await update.message.reply_text("Reply to someone to add them as sudo.")
+    user_id = update.message.reply_to_message.from_user.id
+    SUDO_USERS.add(user_id)
+    with open(SUDO_FILE, "w") as f: json.dump(list(SUDO_USERS), f)
+    await update.message.reply_text(f"User {user_id} added to SUDO.")
+@only_sudo
+async def status(update, context):
+    cid = update.message.chat_id
+    active = group_tasks.get(cid, {})
+    if not active: return await update.message.reply_text("No active tasks in this chat.")
+    await update.message.reply_text(f"Active Tasks: {', '.join(active.keys())}")
+@only_sudo
+async def set_delay(update, context):
+    global GLOBAL_DELAY
+    if not context.args:
+        return await update.message.reply_text(f"Current delay: {GLOBAL_DELAY}s\nUse /delay <seconds>")
+    try:
+        new_delay = float(context.args[0])
+        GLOBAL_DELAY = new_delay
+        await update.message.reply_text(f"✅  Speed updated to {GLOBAL_DELAY}s")
+    except ValueError:
+        await update.message.reply_text("❌  Invalid value. Use /delay 0.1")
+@only_sudo
+async def handle_loop(update, context):
+    text = update.message.text
+    if not text: return
+    cmd = text.split()[0][1:].split("@")[0]
+    mode = cmd
+    if not context.args: return await update.message.reply_text(f"/{mode} <text>")
+    base, cid = " ".join(context.args), update.message.chat_id
+    reply_to_id = None
+    if mode == "swipe" or mode == "chudai":
+        if update.message.reply_to_message:
+            reply_to_id = update.message.reply_to_message.message_id
+        else:
+            return await update.message.reply_text(f"Reply to a message to use /{mode}.")
+    group_tasks.setdefault(cid, {})
+    for bot_info in bots_data:
+        task_key = f"{bot_info['id']}_{mode}"
+        if task_key not in group_tasks[cid]:
+            bot = Application.builder().token(bot_info['token']).build().bot
+            group_tasks[cid][task_key] = asyncio.create_task(bot_loop(bot, cid,
+base, mode, reply_to_id))
+    await update.message.reply_text(f"{mode.upper()} ACTIVE FOR ALL BOTS")
+async def main():
+    global bots_data
+    apps = []
+    for token in TOKENS:
+        try:
+            app = Application.builder().token(token).build()
+            bot_obj = await app.bot.get_me()
+            bots_data.append({'id': bot_obj.id, 'token': token})
+            app.add_handler(CommandHandler("start", start_cmd))
+            app.add_handler(CommandHandler("help", help_cmd))
+            app.add_handler(CommandHandler("stopall", stopall))
+            app.add_handler(CommandHandler("addsudo", addsudo))
+            app.add_handler(CommandHandler("status", status))
+            app.add_handler(CommandHandler("myid", lambda u, c: u.message.reply_text(f"ID: {u.effective_user.id}")))
+            app.add_handler(CommandHandler("ping", lambda u, c: u.message.reply_text("PONG!")))
+            app.add_handler(CommandHandler("delay", set_delay))
+            for m in ["raid", "ncloop", "ncemo", "mulla", "mulla2", "drags", "ncbaap", "rehand", "heartloop", "animal", "mask", "flownc", "choco", "allin1", "genosspam", "swipe", "chudai", "nextgen", "moneytalk", "chudville"]:
+                app.add_handler(CommandHandler(m, handle_loop))
+            await app.initialize()
+            await app.start()
+            if app.updater: await app.updater.start_polling()
+            apps.append(app)
+            print(f"Bot {bot_obj.username} OK")
+        except Exception as e: print(f"Error starting bot: {e}")
+    if not bots_data: return
+    print("🚀 Running"); await asyncio.Event().wait()
+if __name__ == "__main__":
+    asyncio.run(main())
